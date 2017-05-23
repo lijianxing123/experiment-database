@@ -1,0 +1,5 @@
+749e831 - Ferdinand Xu , 7 months ago : HIVE-13589: beeline support prompt for password with '-p' option (Vihang Karajgaonkar, reviewed by Ferdinand Xu, Jia Ke)
+623d292 - Zhihai Xu , 6 months ago : HIVE-15171: set SparkTask's jobID with application id (Zhihai Xu, reviewed by Chao Sun)
+97f7d7b - Chaoyu Tang , 7 months ago : HIVE-15109: Set MaxPermSize to 256M for maven tests with JDKs prior to 8 (Chaoyu Tang, reviewed by Siddharth Seth, Sergio Pena)
+
+95b17e5 - Wei Zheng , 7 months ago : HIVE-15099 : PTFOperator.PTFInvocation didn't properly reset the input partition (Wei Zheng, reviewed by Ashutosh Chauhan)

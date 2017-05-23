@@ -1,0 +1,881 @@
+commit ed3c3edcf175276a1b061680651fa1753e354c0e
+Author: Chao Sun <sunchao@apache.org>
+Date:   Wed May 17 09:39:29 2017 -0700
+
+    HIVE-16698: HoS should avoid mapjoin optimization in case of union and using table stats (Chao Sun, reviewed by Xuefu Zhang)
+
+ .../test/resources/testconfiguration.properties    |   2 +-
+ .../ql/optimizer/spark/SparkMapJoinOptimizer.java  |   3 +-
+ .../spark_use_file_size_for_mapjoin.q              |  30 --
+ .../spark_use_ts_stats_for_mapjoin.q               |  75 +++
+ .../spark/spark_use_ts_stats_for_mapjoin.q.out     | 574 +++++++++++++++++++++
+ 5 files changed, 652 insertions(+), 32 deletions(-)
+
+commit 92983158abc1fe55f36240a8e1a5eadda5ff08e8
+Author: Chao Sun <sunchao@apache.org>
+Date:   Wed May 17 09:18:13 2017 -0700
+
+    HIVE-16696: Fix JoinCondDesc explain string (Chao Sun, reviewed by Xuefu Zhang)
+
+ .../apache/hadoop/hive/ql/plan/JoinCondDesc.java   | 10 +--
+ .../clientpositive/annotate_stats_join.q.out       |  4 +-
+ .../test/results/clientpositive/auto_join20.q.out  |  4 +-
+ .../test/results/clientpositive/auto_join21.q.out  |  4 +-
+ .../test/results/clientpositive/auto_join28.q.out  | 16 ++--
+ .../test/results/clientpositive/auto_join29.q.out  | 24 +++---
+ .../test/results/clientpositive/auto_join31.q.out  |  6 +-
+ .../test/results/clientpositive/auto_join4.q.out   |  2 +-
+ .../test/results/clientpositive/auto_join5.q.out   |  2 +-
+ .../test/results/clientpositive/auto_join7.q.out   |  2 +-
+ .../test/results/clientpositive/auto_join8.q.out   |  2 +-
+ .../clientpositive/auto_sortmerge_join_14.q.out    |  8 +-
+ .../clientpositive/auto_sortmerge_join_15.q.out    |  8 +-
+ .../clientpositive/beeline/smb_mapjoin_1.q.out     |  8 +-
+ .../clientpositive/beeline/smb_mapjoin_2.q.out     |  8 +-
+ .../clientpositive/beeline/smb_mapjoin_3.q.out     |  8 +-
+ .../cbo_SortUnionTransposeRule.q.out               |  8 +-
+ .../test/results/clientpositive/cbo_rp_join0.q.out |  6 +-
+ .../results/clientpositive/constant_prop_3.q.out   |  2 +-
+ .../clientpositive/correlationoptimizer8.q.out     |  8 +-
+ .../results/clientpositive/cross_join_merge.q.out  |  4 +-
+ .../results/clientpositive/dynamic_rdd_cache.q.out |  2 +-
+ .../test/results/clientpositive/empty_join.q.out   |  2 +-
+ .../clientpositive/filter_cond_pushdown2.q.out     |  2 +-
+ .../results/clientpositive/infer_join_preds.q.out  |  6 +-
+ ql/src/test/results/clientpositive/innerjoin.q.out |  2 +-
+ ql/src/test/results/clientpositive/join20.q.out    |  4 +-
+ ql/src/test/results/clientpositive/join21.q.out    |  4 +-
+ ql/src/test/results/clientpositive/join39.q.out    |  2 +-
+ ql/src/test/results/clientpositive/join4.q.out     |  2 +-
+ ql/src/test/results/clientpositive/join40.q.out    |  8 +-
+ ql/src/test/results/clientpositive/join41.q.out    |  4 +-
+ ql/src/test/results/clientpositive/join45.q.out    | 10 +--
+ ql/src/test/results/clientpositive/join46.q.out    | 32 ++++----
+ ql/src/test/results/clientpositive/join5.q.out     |  2 +-
+ ql/src/test/results/clientpositive/join7.q.out     |  2 +-
+ ql/src/test/results/clientpositive/join8.q.out     |  2 +-
+ .../join_cond_pushdown_unqual5.q.out               |  4 +-
+ .../clientpositive/join_emit_interval.q.out        |  4 +-
+ .../clientpositive/join_filters_overlap.q.out      | 22 ++---
+ .../test/results/clientpositive/join_merging.q.out |  6 +-
+ .../test/results/clientpositive/join_reorder.q.out | 20 ++---
+ ql/src/test/results/clientpositive/join_star.q.out | 18 ++---
+ ql/src/test/results/clientpositive/lineage1.q.out  |  4 +-
+ .../results/clientpositive/llap/auto_join21.q.out  |  4 +-
+ .../results/clientpositive/llap/auto_join29.q.out  | 24 +++---
+ .../results/clientpositive/llap/auto_join30.q.out  | 18 ++---
+ .../llap/auto_sortmerge_join_14.q.out              |  4 +-
+ .../llap/auto_sortmerge_join_15.q.out              |  4 +-
+ .../clientpositive/llap/bucket_map_join_tez2.q.out |  4 +-
+ .../llap/correlationoptimizer1.q.out               | 20 ++---
+ .../llap/correlationoptimizer2.q.out               |  8 +-
+ .../llap/correlationoptimizer4.q.out               | 24 +++---
+ .../llap/dynamic_partition_pruning.q.out           |  8 +-
+ .../llap/dynamic_semijoin_reduction_3.q.out        |  6 +-
+ .../llap/hybridgrace_hashjoin_1.q.out              |  4 +-
+ .../clientpositive/llap/join32_lessSize.q.out      |  2 +-
+ .../test/results/clientpositive/llap/join46.q.out  | 32 ++++----
+ .../clientpositive/llap/join_emit_interval.q.out   |  4 +-
+ .../clientpositive/llap/limit_join_transpose.q.out | 36 ++++-----
+ .../clientpositive/llap/llap_nullscan.q.out        |  2 +-
+ .../results/clientpositive/llap/mapjoin3.q.out     |  2 +-
+ .../results/clientpositive/llap/mapjoin46.q.out    | 30 +++----
+ .../llap/mapjoin_emit_interval.q.out               |  4 +-
+ .../results/clientpositive/llap/mergejoin.q.out    |  4 +-
+ .../clientpositive/llap/optimize_nullscan.q.out    |  6 +-
+ .../results/clientpositive/llap/semijoin.q.out     | 10 +--
+ .../results/clientpositive/llap/skewjoin.q.out     |  2 +-
+ .../clientpositive/llap/skewjoinopt15.q.out        |  4 +-
+ .../clientpositive/llap/smb_mapjoin_17.q.out       | 64 +++++++--------
+ .../clientpositive/llap/smb_mapjoin_4.q.out        | 28 +++----
+ .../clientpositive/llap/smb_mapjoin_5.q.out        | 28 +++----
+ .../results/clientpositive/llap/sqlmerge.q.out     |  4 +-
+ .../results/clientpositive/llap/subquery_in.q.out  | 14 ++--
+ .../clientpositive/llap/subquery_multi.q.out       | 30 +++----
+ .../clientpositive/llap/subquery_notin.q.out       | 92 ++++++++++-----------
+ .../clientpositive/llap/subquery_null_agg.q.out    |  2 +-
+ .../clientpositive/llap/subquery_scalar.q.out      | 44 +++++-----
+ .../clientpositive/llap/subquery_select.q.out      | 94 +++++++++++-----------
+ .../clientpositive/llap/subquery_views.q.out       |  8 +-
+ .../clientpositive/llap/table_nonprintable.q.out   |  2 +-
+ .../llap/tez_dynpart_hashjoin_3.q.out              |  4 +-
+ .../clientpositive/llap/tez_join_tests.q.out       |  4 +-
+ .../clientpositive/llap/tez_joins_explain.q.out    |  4 +-
+ .../clientpositive/llap/tez_nway_join.q.out        |  8 +-
+ .../clientpositive/llap/tez_smb_empty.q.out        |  6 +-
+ .../results/clientpositive/llap/tez_union.q.out    |  6 +-
+ .../clientpositive/llap/tez_union_group_by.q.out   |  2 +-
+ .../clientpositive/llap/unionDistinct_1.q.out      |  2 +-
+ .../clientpositive/llap/vector_coalesce_3.q.out    |  2 +-
+ .../llap/vector_groupby_mapjoin.q.out              |  2 +-
+ .../clientpositive/llap/vector_join30.q.out        | 18 ++---
+ .../llap/vector_left_outer_join.q.out              |  4 +-
+ .../llap/vector_left_outer_join2.q.out             | 12 +--
+ .../llap/vector_leftsemi_mapjoin.q.out             | 32 ++++----
+ .../clientpositive/llap/vector_outer_join0.q.out   |  4 +-
+ .../clientpositive/llap/vector_outer_join1.q.out   |  8 +-
+ .../clientpositive/llap/vector_outer_join2.q.out   |  4 +-
+ .../vectorized_dynamic_partition_pruning.q.out     |  8 +-
+ .../clientpositive/llap/vectorized_join46.q.out    | 26 +++---
+ ql/src/test/results/clientpositive/mapjoin1.q.out  | 12 +--
+ ql/src/test/results/clientpositive/mapjoin3.q.out  |  2 +-
+ ql/src/test/results/clientpositive/mapjoin46.q.out | 30 +++----
+ .../mapjoin_filter_on_outerjoin.q.out              |  4 +-
+ .../clientpositive/mapjoin_test_outer.q.out        |  4 +-
+ .../test/results/clientpositive/masking_10.q.out   |  4 +-
+ ql/src/test/results/clientpositive/mergejoin.q.out |  4 +-
+ .../test/results/clientpositive/mergejoins.q.out   |  2 +-
+ .../results/clientpositive/mergejoins_mixed.q.out  | 40 ++++-----
+ .../clientpositive/multi_insert_with_join2.q.out   |  4 +-
+ .../results/clientpositive/optional_outer.q.out    |  8 +-
+ .../clientpositive/position_alias_test_1.q.out     |  4 +-
+ .../results/clientpositive/ppd_outer_join5.q.out   |  6 +-
+ .../results/clientpositive/rcfile_null_value.q.out |  2 +-
+ ql/src/test/results/clientpositive/skewjoin.q.out  |  2 +-
+ .../results/clientpositive/skewjoin_mapjoin1.q.out |  8 +-
+ .../clientpositive/skewjoin_mapjoin10.q.out        |  8 +-
+ .../clientpositive/skewjoin_union_remove_1.q.out   |  8 +-
+ .../test/results/clientpositive/skewjoinopt1.q.out |  8 +-
+ .../test/results/clientpositive/skewjoinopt2.q.out |  8 +-
+ .../results/clientpositive/smb_mapjoin_1.q.out     |  8 +-
+ .../results/clientpositive/smb_mapjoin_2.q.out     |  8 +-
+ .../results/clientpositive/smb_mapjoin_3.q.out     |  8 +-
+ .../results/clientpositive/smb_mapjoin_46.q.out    | 26 +++---
+ .../clientpositive/spark/annotate_stats_join.q.out |  4 +-
+ .../results/clientpositive/spark/auto_join20.q.out |  4 +-
+ .../results/clientpositive/spark/auto_join21.q.out |  4 +-
+ .../results/clientpositive/spark/auto_join28.q.out | 16 ++--
+ .../results/clientpositive/spark/auto_join29.q.out | 24 +++---
+ .../results/clientpositive/spark/auto_join30.q.out | 18 ++---
+ .../results/clientpositive/spark/auto_join31.q.out |  2 +-
+ .../results/clientpositive/spark/auto_join4.q.out  |  2 +-
+ .../results/clientpositive/spark/auto_join5.q.out  |  2 +-
+ .../results/clientpositive/spark/auto_join7.q.out  |  2 +-
+ .../results/clientpositive/spark/auto_join8.q.out  |  2 +-
+ .../spark/auto_sortmerge_join_14.q.out             |  4 +-
+ .../spark/auto_sortmerge_join_15.q.out             |  4 +-
+ .../spark/bucket_map_join_tez2.q.out               |  4 +-
+ .../clientpositive/spark/dynamic_rdd_cache.q.out   |  2 +-
+ .../results/clientpositive/spark/innerjoin.q.out   |  2 +-
+ .../test/results/clientpositive/spark/join20.q.out |  4 +-
+ .../test/results/clientpositive/spark/join21.q.out |  4 +-
+ .../clientpositive/spark/join32_lessSize.q.out     |  2 +-
+ .../test/results/clientpositive/spark/join39.q.out |  2 +-
+ .../test/results/clientpositive/spark/join4.q.out  |  2 +-
+ .../test/results/clientpositive/spark/join41.q.out |  4 +-
+ .../test/results/clientpositive/spark/join5.q.out  |  2 +-
+ .../test/results/clientpositive/spark/join7.q.out  |  2 +-
+ .../test/results/clientpositive/spark/join8.q.out  |  2 +-
+ .../spark/join_filters_overlap.q.out               | 22 ++---
+ .../clientpositive/spark/join_merging.q.out        |  6 +-
+ .../clientpositive/spark/join_reorder.q.out        | 20 ++---
+ .../results/clientpositive/spark/join_star.q.out   | 18 ++---
+ .../results/clientpositive/spark/mapjoin1.q.out    | 12 +--
+ .../spark/mapjoin_filter_on_outerjoin.q.out        |  4 +-
+ .../clientpositive/spark/mapjoin_test_outer.q.out  |  4 +-
+ .../results/clientpositive/spark/mergejoins.q.out  |  2 +-
+ .../clientpositive/spark/mergejoins_mixed.q.out    | 40 ++++-----
+ .../clientpositive/spark/optimize_nullscan.q.out   |  6 +-
+ .../clientpositive/spark/ppd_outer_join5.q.out     |  6 +-
+ .../results/clientpositive/spark/semijoin.q.out    | 10 +--
+ .../results/clientpositive/spark/skewjoin.q.out    |  2 +-
+ .../spark/skewjoin_union_remove_1.q.out            |  8 +-
+ .../clientpositive/spark/skewjoinopt1.q.out        |  8 +-
+ .../clientpositive/spark/skewjoinopt15.q.out       |  8 +-
+ .../clientpositive/spark/skewjoinopt2.q.out        |  8 +-
+ .../clientpositive/spark/smb_mapjoin_1.q.out       |  8 +-
+ .../clientpositive/spark/smb_mapjoin_17.q.out      | 64 +++++++--------
+ .../clientpositive/spark/smb_mapjoin_2.q.out       |  8 +-
+ .../clientpositive/spark/smb_mapjoin_3.q.out       |  8 +-
+ .../clientpositive/spark/smb_mapjoin_4.q.out       | 28 +++----
+ .../clientpositive/spark/smb_mapjoin_5.q.out       | 28 +++----
+ .../results/clientpositive/spark/subquery_in.q.out | 14 ++--
+ .../spark/subquery_multiinsert.q.out               |  4 +-
+ .../clientpositive/spark/tez_join_tests.q.out      |  4 +-
+ .../clientpositive/spark/tez_joins_explain.q.out   |  4 +-
+ .../results/clientpositive/spark/union22.q.out     |  2 +-
+ .../clientpositive/spark/union_lateralview.q.out   |  2 +-
+ .../spark/vector_left_outer_join.q.out             |  4 +-
+ .../clientpositive/spark/vector_outer_join0.q.out  |  4 +-
+ .../clientpositive/spark/vector_outer_join1.q.out  |  8 +-
+ .../clientpositive/spark/vector_outer_join2.q.out  |  4 +-
+ .../clientpositive/subquery_in_having.q.out        | 20 ++---
+ .../clientpositive/subquery_multiinsert.q.out      |  4 +-
+ .../clientpositive/subquery_notexists.q.out        | 12 +--
+ .../clientpositive/subquery_notexists_having.q.out |  4 +-
+ .../clientpositive/subquery_notin_having.q.out     | 14 ++--
+ .../clientpositive/subquery_unqual_corr_expr.q.out |  2 +-
+ .../clientpositive/subquery_unqualcolumnrefs.q.out |  4 +-
+ .../tez/hybridgrace_hashjoin_1.q.out               |  4 +-
+ ql/src/test/results/clientpositive/union22.q.out   |  4 +-
+ .../results/clientpositive/union_lateralview.q.out |  2 +-
+ .../test/results/clientpositive/union_offcbo.q.out |  8 +-
+ .../results/clientpositive/vector_coalesce_3.q.out |  2 +-
+ .../clientpositive/vector_groupby_mapjoin.q.out    |  4 +-
+ .../clientpositive/vector_left_outer_join.q.out    |  4 +-
+ .../clientpositive/vector_left_outer_join2.q.out   | 12 +--
+ .../clientpositive/vector_outer_join0.q.out        |  4 +-
+ .../clientpositive/vector_outer_join1.q.out        |  8 +-
+ .../clientpositive/vector_outer_join2.q.out        |  4 +-
+ .../clientpositive/vector_outer_join3.q.out        |  6 +-
+ .../clientpositive/vector_outer_join4.q.out        |  6 +-
+ .../clientpositive/vector_outer_join6.q.out        |  4 +-
+ 203 files changed, 994 insertions(+), 994 deletions(-)
+
+commit 89699ef4be80150cc31f89eefaf9d3db20e30e6e
+Author: Chao Sun <sunchao@apache.org>
+Date:   Wed May 17 14:22:02 2017 -0700
+
+    HIVE-16700: Log ZK discovery info (hostname & port) for HTTP mode when connection is established (Chao Sun, reviewed by Xuefu Zhang)
+
+ jdbc/src/java/org/apache/hive/jdbc/HiveConnection.java | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+commit 1f49635e8ddbe2fbd8551d0a7f1b9ec618da29d0
+Author: Sushanth Sowmyan <khorgath@gmail.com>
+Date:   Wed May 17 12:29:07 2017 -0700
+
+    HIVE-16272 : support for drop function in incremental replication (Anishek Agarwal, reviewed by Sushanth Sowmyan)
+
+ .../TestReplicationScenariosAcrossInstances.java   | 26 +++++++++++-
+ .../hadoop/hive/ql/parse/WarehouseInstance.java    | 22 ++++------
+ .../apache/hadoop/hive/ql/parse/repl/DumpType.java |  7 ++++
+ .../repl/dump/events/DropFunctionHandler.java      | 42 +++++++++++++++++++
+ .../repl/dump/events/EventHandlerFactory.java      |  1 +
+ .../repl/load/message/DropFunctionHandler.java     | 48 ++++++++++++++++++++++
+ .../parse/repl/load/message/DropTableHandler.java  |  8 ++--
+ 7 files changed, 136 insertions(+), 18 deletions(-)
+
+commit 029763517b45f1bd8c96bcfad9c892f6d4c67ea5
+Author: Juan Rodr¨ªguez Hortal¨¢ <hortala@amazon.com>
+Date:   Wed May 17 13:50:22 2017 -0500
+
+    HIVE-16539: Add PTF tests for blobstores (Juan Rodr¨ªguez Hortal¨¢, reviewed by Sergio Pena)
+
+ data/files/part.orc                                | Bin 0 -> 2689 bytes
+ .../queries/clientpositive/ptf_general_queries.q   |  34 ++
+ .../test/queries/clientpositive/ptf_matchpath.q    |  35 ++
+ .../src/test/queries/clientpositive/ptf_orcfile.q  |  32 ++
+ .../test/queries/clientpositive/ptf_persistence.q  |  15 +
+ .../src/test/queries/clientpositive/ptf_rcfile.q   |  32 ++
+ .../src/test/queries/clientpositive/ptf_seqfile.q  |  32 ++
+ .../clientpositive/ptf_general_queries.q.out       | 139 ++++++
+ .../results/clientpositive/ptf_matchpath.q.out     | 105 ++++
+ .../test/results/clientpositive/ptf_orcfile.q.out  | 104 ++++
+ .../results/clientpositive/ptf_persistence.q.out   | 549 +++++++++++++++++++++
+ .../test/results/clientpositive/ptf_rcfile.q.out   | 104 ++++
+ .../test/results/clientpositive/ptf_seqfile.q.out  | 104 ++++
+ 13 files changed, 1285 insertions(+)
+
+commit eead46c4cdcff7b01e20d9abcc905e1520cec40f
+Author: Siddharth Seth <sseth@apache.org>
+Date:   Wed May 17 10:57:19 2017 -0700
+
+    HIVE-16692. LLAP: Keep alive connection in shuffle handler should not be closed until entire data is flushed out. (Rajesh Balamohan, reviewed by Siddharth Seth)
+
+ .../hive/llap/shufflehandler/ShuffleHandler.java   | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
+
+commit c99549fba67f0e4971e74b6872596408fce0f25d
+Author: Rentao Wu <rewu@amazon.com>
+Date:   Wed May 17 10:13:21 2017 -0500
+
+    HIVE-16664: Add join related Hive blobstore tests (Rentao Wu, reviewed by Sergio Pena)
+
+ data/files/4col_data.txt                           |   7 +
+ data/files/5col_data.txt                           |   3 +
+ .../src/test/queries/clientpositive/join.q         |  66 +++
+ .../src/test/queries/clientpositive/join2.q        |  19 +
+ .../src/test/queries/clientpositive/map_join.q     |  24 +
+ .../queries/clientpositive/map_join_on_filter.q    |  16 +
+ .../queries/clientpositive/nested_outer_join.q     |  25 +
+ .../src/test/results/clientpositive/join.q.out     | 198 ++++++++
+ .../src/test/results/clientpositive/join2.q.out    |  64 +++
+ .../src/test/results/clientpositive/map_join.q.out | 563 +++++++++++++++++++++
+ .../clientpositive/map_join_on_filter.q.out        |  50 ++
+ .../results/clientpositive/nested_outer_join.q.out |  76 +++
+ 12 files changed, 1111 insertions(+)
+
+commit e97734b1ca010d9690bbb0d6bdddf92082a20688
+Author: Sankar Hariappan <mailtosankarh@gmail.com>
+Date:   Wed May 17 00:21:39 2017 -0700
+
+    HIVE-16678 : Truncate on temporary table fails with "table not found" error. (Sankar Hariappan via Thejas Nair)
+
+ .../ql/metadata/SessionHiveMetaStoreClient.java    |  76 +++++++++++
+ .../queries/clientpositive/temp_table_truncate.q   |  21 +++
+ .../clientpositive/temp_table_truncate.q.out       | 143 +++++++++++++++++++++
+ 3 files changed, 240 insertions(+)
+
+commit 5a0b42537f97e76430bcf0a62c9c6fa26c4b1e01
+Author: Prasanth Jayachandran <prasanthj@apache.org>
+Date:   Tue May 16 23:14:26 2017 -0700
+
+    HIVE-16582: HashTableLoader should log info about the input, rows, size etc. (Prasanth Jayachandran reviewed by Sergey Shelukhin)
+
+ .../hadoop/hive/ql/exec/MapJoinOperator.java       |   4 +
+ .../hadoop/hive/ql/exec/MemoryMonitorInfo.java     | 166 +++++++++++++++++++++
+ .../hive/ql/exec/SerializationUtilities.java       |   1 +
+ .../hadoop/hive/ql/exec/tez/HashTableLoader.java   |  68 +++++----
+ .../fast/VectorMapJoinFastHashTableLoader.java     |  73 +++++----
+ .../hive/ql/optimizer/ConvertJoinMapJoin.java      |  48 +++---
+ .../hadoop/hive/ql/optimizer/MapJoinProcessor.java |   4 +-
+ .../hive/ql/optimizer/SharedScanOptimizer.java     |   4 +-
+ .../calcite/translator/HiveOpConverter.java        |   2 +-
+ .../optimizer/physical/GenMRSkewJoinProcessor.java |   2 +-
+ .../physical/GenSparkSkewJoinProcessor.java        |   2 +-
+ .../hadoop/hive/ql/parse/SemanticAnalyzer.java     |   2 +-
+ .../org/apache/hadoop/hive/ql/plan/JoinDesc.java   |  23 +--
+ .../apache/hadoop/hive/ql/plan/MapJoinDesc.java    |   5 +-
+ .../apache/hadoop/hive/ql/exec/TestOperators.java  |  57 +++----
+ .../results/clientpositive/llap/tez_smb_main.q.out |  18 +--
+ 16 files changed, 328 insertions(+), 151 deletions(-)
+
+commit 045b8da502328e72976d9e3aeb79a50090596bda
+Author: Sushanth Sowmyan <khorgath@gmail.com>
+Date:   Tue May 16 16:17:33 2017 -0700
+
+    HIVE-16642 : New Events created as part of replv2 potentially break replv1 (Sushanth Sowmyan, reviewed by Thejas Nair)
+
+ hcatalog/webhcat/java-client/pom.xml               |  24 ++-
+ .../hcatalog/api/repl/ErroredReplicationTask.java  |  52 ++++++
+ .../api/repl/exim/EximReplicationTaskFactory.java  |   5 +-
+ .../hcatalog/api/repl/ReplicationV1CompatRule.java | 208 +++++++++++++++++++++
+ itests/hcatalog-unit/pom.xml                       |   7 +
+ .../listener/TestDbNotificationListener.java       |  19 ++
+ itests/hive-unit/pom.xml                           |  12 ++
+ .../hive/ql/parse/TestReplicationScenarios.java    |   8 +
+ .../TestReplicationScenariosAcrossInstances.java   |   6 +
+ .../hadoop/hive/ql/parse/WarehouseInstance.java    |  15 ++
+ 10 files changed, 353 insertions(+), 3 deletions(-)
+
+commit 6e0c52e6883cb55de3b8557504c13f3c8dfb619f
+Author: Yongzhi Chen <ychena@apache.org>
+Date:   Fri May 12 10:06:04 2017 -0400
+
+    HIVE-16660: Not able to add partition for views in hive when sentry is enabled (Yongzhi Chen, reviewed by Aihua Xu)
+
+ ql/src/java/org/apache/hadoop/hive/ql/metadata/Partition.java  | 10 ++++++++--
+ .../org/apache/hadoop/hive/ql/parse/DDLSemanticAnalyzer.java   |  4 +++-
+ 2 files changed, 11 insertions(+), 3 deletions(-)
+
+commit 2bcbd29e8d2fbc740c762997663cc40853892add
+Author: Aihua Xu <aihuaxu@apache.org>
+Date:   Thu May 11 10:11:29 2017 -0400
+
+    HIVE-16647: Improve the validation output to make the output to stderr and stdout more consistent (Aihua Xu, reviewed by Yongzhi Chen)
+
+ .../org/apache/hive/beeline/HiveSchemaTool.java    | 46 +++++++++++-----------
+ 1 file changed, 22 insertions(+), 24 deletions(-)
+
+commit c19981c66070b51df8c9129da69407c8be586d9d
+Author: Jesus Camacho Rodriguez <jcamacho@apache.org>
+Date:   Tue May 16 13:37:45 2017 +0100
+
+    HIVE-16602: Implement shared scans with Tez (Jesus Camacho Rodriguez, reviewed by Ashutosh Chauhan) (addendum II)
+
+ ql/src/test/results/clientpositive/tez/explainanalyze_3.q.out | 8 ++++----
+ ql/src/test/results/clientpositive/tez/explainuser_3.q.out    | 8 ++++----
+ 2 files changed, 8 insertions(+), 8 deletions(-)
+
+commit 360a91e64590940641aff9304eb0275cbfd82e39
+Author: Niklaus Xiao <stone_xy@live.cn>
+Date:   Tue May 16 08:39:16 2017 +0200
+
+    HIVE-15483: Database and table name is case sensitive when used in show grant (Niklaus Xiao via Zoltan Haindrich)
+    
+    Signed-off-by: Zoltan Haindrich <kirk@rxd.hu>
+
+ metastore/src/java/org/apache/hadoop/hive/metastore/ObjectStore.java | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+commit 91948ec00b1b642b401bfb529f211eb59b8b16ad
+Author: Niklaus Xiao <stone_xy@live.cn>
+Date:   Tue May 16 08:36:05 2017 +0200
+
+    HIVE-16413: Create table as select does not check ownership of the location (Niklaus Xiao via Zoltan Haindrich)
+    
+    Signed-off-by: Zoltan Haindrich <kirk@rxd.hu>
+
+ .../ql/security/authorization/plugin/sqlstd/Operation2Privilege.java     | 1 +
+ 1 file changed, 1 insertion(+)
+
+commit 23e703f96935ecd6c7daf6316329f305ccac6615
+Author: Janos Gub <gubjanos@gmail.com>
+Date:   Tue May 16 08:30:58 2017 +0200
+
+    HIVE-16619: Clean up javadoc from errors in module hive-serde (Janos Gub via Zoltan Haindrich)
+    
+    Signed-off-by: Zoltan Haindrich <kirk@rxd.hu>
+
+ .../apache/hadoop/hive/serde2/AbstractSerDe.java    |  2 +-
+ .../hadoop/hive/serde2/ColumnProjectionUtils.java   |  8 ++++----
+ .../org/apache/hadoop/hive/serde2/SerDeUtils.java   |  2 +-
+ .../hive/serde2/avro/AvroLazyObjectInspector.java   |  2 +-
+ .../hive/serde2/avro/AvroSchemaRetriever.java       |  2 +-
+ .../hadoop/hive/serde2/columnar/ColumnarSerDe.java  |  4 ++--
+ .../hive/serde2/columnar/ColumnarStructBase.java    |  2 +-
+ .../serde2/dynamic_type/DynamicSerDeStructBase.java |  2 +-
+ .../hive/serde2/dynamic_type/ParseException.java    |  2 +-
+ .../hadoop/hive/serde2/fast/DeserializeRead.java    |  6 +++---
+ .../hadoop/hive/serde2/io/TimestampWritable.java    |  6 +++---
+ .../apache/hadoop/hive/serde2/lazy/LazyDate.java    |  2 +-
+ .../apache/hadoop/hive/serde2/lazy/LazyFactory.java | 21 ++++++++-------------
+ .../hadoop/hive/serde2/lazy/LazyHiveDecimal.java    |  2 +-
+ .../hadoop/hive/serde2/lazy/LazySimpleSerDe.java    | 12 ++++++------
+ .../hive/serde2/lazybinary/LazyBinaryArray.java     |  2 +-
+ .../hive/serde2/lazybinary/LazyBinaryMap.java       |  2 +-
+ .../hive/serde2/lazybinary/LazyBinarySerDe.java     |  6 +++---
+ .../hive/serde2/lazybinary/LazyBinaryString.java    |  2 +-
+ .../hive/serde2/lazybinary/LazyBinaryStruct.java    |  2 +-
+ .../hive/serde2/lazybinary/LazyBinaryUnion.java     |  2 +-
+ .../hive/serde2/lazybinary/LazyBinaryUtils.java     |  2 +-
+ .../serde2/objectinspector/ObjectInspector.java     |  2 +-
+ .../objectinspector/ObjectInspectorUtils.java       |  4 ++--
+ .../primitive/PrimitiveObjectInspectorFactory.java  |  6 +++---
+ .../hadoop/hive/serde2/typeinfo/TypeInfoUtils.java  |  4 ++--
+ 26 files changed, 52 insertions(+), 57 deletions(-)
+
+commit 202c5137f2b73ead25d6907d1f74a8857690440e
+Author: Janos Gub <gubjanos@gmail.com>
+Date:   Tue May 16 08:27:39 2017 +0200
+
+    HIVE-16618: Clean up javadoc from errors in module hive-common (Janos Gub via Zoltan Haindrich)
+    
+    Signed-off-by: Zoltan Haindrich <kirk@rxd.hu>
+
+ .../java/org/apache/hadoop/hive/common/CompressionUtils.java |  8 ++++----
+ common/src/java/org/apache/hadoop/hive/common/JavaUtils.java |  4 ++--
+ .../java/org/apache/hadoop/hive/common/StatsSetupConst.java  |  6 +++---
+ .../org/apache/hadoop/hive/common/ValidCompactorTxnList.java |  4 ++--
+ .../hadoop/hive/common/classification/RetrySemantics.java    |  1 -
+ .../org/apache/hadoop/hive/common/cli/CommonCliOptions.java  |  4 ++--
+ .../hadoop/hive/common/metrics/common/MetricsVariable.java   |  2 +-
+ .../java/org/apache/hadoop/hive/common/type/Decimal128.java  | 12 +++++-------
+ .../src/java/org/apache/hadoop/hive/conf/HiveConfUtil.java   |  3 ++-
+ .../java/org/apache/hive/common/util/HiveStringUtils.java    |  4 ++--
+ .../org/apache/hive/common/util/ShutdownHookManager.java     |  2 +-
+ common/src/java/org/apache/hive/http/HttpServer.java         |  6 ++++--
+ common/src/java/org/apache/hive/http/JMXJsonServlet.java     |  6 +++---
+ 13 files changed, 31 insertions(+), 31 deletions(-)
+
+commit 7827316f0c4cb9e9fe63506687b33bf4b2c4e70a
+Author: Janos Gub <gubjanos@gmail.com>
+Date:   Tue May 16 08:25:37 2017 +0200
+
+    HIVE-16617: Clean up javadoc from errors in module hive-shims (Janos Gub via Zoltan Haindrich)
+    
+    Signed-off-by: Zoltan Haindrich <kirk@rxd.hu>
+
+ .../src/main/java/org/apache/hadoop/hive/shims/HadoopShims.java      | 5 ++---
+ .../java/org/apache/hadoop/hive/thrift/HadoopThriftAuthBridge.java   | 4 ++--
+ .../hadoop/hive/thrift/TokenStoreDelegationTokenSecretManager.java   | 2 +-
+ 3 files changed, 5 insertions(+), 6 deletions(-)
+
+commit 1b8ba022c26ef929f35dc12c5c70e1683fa2e373
+Author: Peter Vary <pvary@cloudera.com>
+Date:   Tue May 16 08:13:28 2017 +0200
+
+    HIVE-15726: Reenable indentation checks to checkstyle (Peter Vary via Zoltan Haindrich)
+    
+    Signed-off-by: Zoltan Haindrich <kirk@rxd.hu>
+
+ checkstyle/checkstyle.xml | 8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
+
+commit 0ce98b3a7527f72216e9e41f7e610b44ee524758
+Author: Gunther Hagleitner <gunther@apache.org>
+Date:   Mon May 15 14:57:30 2017 -0700
+
+    HIVE-1010 Addendum: Commit file missing from original commit (Gunther Hagleitner)
+
+ metastore/scripts/upgrade/hive/upgrade.order.hive | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+
+commit 7d4554dd1def433e0439cdbe7dfa665b6909e706
+Author: Aihua Xu <aihuaxu@apache.org>
+Date:   Mon May 15 16:08:50 2017 -0400
+
+    HIVE-16324: Truncate table should not work when EXTERNAL property of table is true (Vihang Karajgaonkar via Aihua Xu, reviewed by Thejas M Nair)
+
+ .../org/apache/hadoop/hive/metastore/ObjectStore.java   |  6 +++---
+ .../apache/hadoop/hive/metastore/cache/CachedStore.java |  2 +-
+ .../queries/clientnegative/truncate_table_failure5.q    |  5 +++++
+ .../queries/clientnegative/truncate_table_failure6.q    |  5 +++++
+ .../clientnegative/truncate_table_failure5.q.out        | 17 +++++++++++++++++
+ .../clientnegative/truncate_table_failure6.q.out        | 17 +++++++++++++++++
+ 6 files changed, 48 insertions(+), 4 deletions(-)
+
+commit 413245ed90f09ab446711ac37f32591e3ac68462
+Author: Zoltan Haindrich <kirk@rxd.hu>
+Date:   Mon May 15 20:31:15 2017 +0200
+
+    Revert "HIVE-16501 : Add rej/orig to .gitignore"
+    
+    Note: removal of *.orig files have been kept
+    This reverts commit c911f42035d9e7b91191e2683f85d8fd2a35eb27.
+
+ .gitignore | 2 --
+ 1 file changed, 2 deletions(-)
+
+commit 0efb93681099af4e4b7269c72d86fe379c99da7c
+Author: Aihua Xu <aihuaxu@apache.org>
+Date:   Mon May 15 14:08:32 2017 -0400
+
+    HIVE-16143: Improve msck repair batching (Vihang Karajgaonkar, reviewed by Sahil Takiar & Aihua Xu)
+
+ .../java/org/apache/hadoop/hive/conf/HiveConf.java |  13 +-
+ .../apache/hive/common/util/RetryUtilities.java    | 112 +++++++
+ .../hive/common/util/TestRetryUtilities.java       | 150 +++++++++
+ .../src/test/queries/clientpositive/create_like.q  |   3 +-
+ .../test/results/clientpositive/create_like.q.out  |  15 +-
+ .../java/org/apache/hadoop/hive/ql/QTestUtil.java  |   3 +-
+ .../org/apache/hadoop/hive/ql/exec/DDLTask.java    |  89 +++---
+ .../ql/exec/TestMsckCreatePartitionsInBatches.java | 340 +++++++++++++++++++++
+ ql/src/test/queries/clientpositive/msck_repair_0.q |  10 +
+ ql/src/test/queries/clientpositive/msck_repair_1.q |   8 +
+ ql/src/test/queries/clientpositive/msck_repair_2.q |   5 +
+ ql/src/test/queries/clientpositive/msck_repair_3.q |   4 +
+ .../queries/clientpositive/msck_repair_batchsize.q |   4 +
+ .../results/clientpositive/msck_repair_0.q.out     |  38 ++-
+ .../results/clientpositive/msck_repair_1.q.out     |  28 +-
+ .../results/clientpositive/msck_repair_2.q.out     |  28 +-
+ .../results/clientpositive/msck_repair_3.q.out     |  28 +-
+ .../clientpositive/msck_repair_batchsize.q.out     |  34 ++-
+ ql/src/test/results/clientpositive/repair.q.out    |   3 +-
+ 19 files changed, 857 insertions(+), 58 deletions(-)
+
+commit 86f74fdd26b83cee128d24055ee369e9b7f36201
+Author: Aihua Xu <aihuaxu@apache.org>
+Date:   Mon May 15 11:12:04 2017 -0400
+
+    HIVE-16607: ColumnStatsAutoGatherContext regenerates HiveConf.HIVEQUERYID (Peter Vary, reviewed by Aihua Xu)
+
+ .../mapreduce/TestHCatMultiOutputFormat.java       |   2 +-
+ .../test/resources/testconfiguration.properties    |   1 +
+ .../java/org/apache/hadoop/hive/ql/QTestUtil.java  |   4 +-
+ .../main/java/org/apache/hive/beeline/QFile.java   |  20 +-
+ .../apache/hive/beeline/QFileBeeLineClient.java    |   8 +-
+ ql/src/java/org/apache/hadoop/hive/ql/Driver.java  |  28 +-
+ .../java/org/apache/hadoop/hive/ql/QueryState.java | 146 +++++++---
+ .../org/apache/hadoop/hive/ql/exec/DDLTask.java    |   2 +-
+ .../hive/ql/io/rcfile/stats/PartialScanTask.java   |   3 +-
+ .../ql/metadata/HiveMaterializedViewsRegistry.java |   5 +-
+ .../ql/parse/ColumnStatsAutoGatherContext.java     |   9 +-
+ .../apache/hadoop/hive/ql/exec/TestExecDriver.java |   3 +-
+ .../hive/ql/parse/TestMacroSemanticAnalyzer.java   |   2 +-
+ .../apache/hadoop/hive/ql/parse/TestQBCompact.java |   2 +-
+ .../ql/parse/TestQBJoinTreeApplyPredicate.java     |   3 +-
+ .../hadoop/hive/ql/parse/TestQBSubQuery.java       |   3 +-
+ .../ql/parse/TestReplicationSemanticAnalyzer.java  |   3 +-
+ .../hive/ql/parse/TestSemanticAnalyzerFactory.java |   2 +-
+ .../ql/parse/TestUpdateDeleteSemanticAnalyzer.java |   2 +-
+ .../TestHiveAuthorizationTaskFactory.java          |   2 +-
+ .../ql/parse/authorization/TestPrivilegesV1.java   |   4 +-
+ .../ql/parse/authorization/TestPrivilegesV2.java   |   2 +-
+ .../beeline/materialized_view_create_rewrite.q.out | 322 +++++++++++++++++++++
+ .../hive/service/cli/operation/Operation.java      |  12 +-
+ .../hive/service/cli/operation/SQLOperation.java   |   6 +-
+ 25 files changed, 498 insertions(+), 98 deletions(-)
+
+commit 455ffdd9125bdfe73b2c7f7ddebaeff138b77f53
+Author: Aihua Xu <aihuaxu@apache.org>
+Date:   Mon May 15 11:09:08 2017 -0400
+
+    HIVE-16645: Commands.java has missed the catch statement and has some code format errors (Saijin Huang, reviewed by Aihua Xu & Peter Vary)
+
+ beeline/src/java/org/apache/hive/beeline/Commands.java | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
+
+commit 77f44b66d188aed676014c226926d647ebec28d3
+Author: Gunther Hagleitner <gunther@apache.org>
+Date:   Mon May 15 08:19:43 2017 -0700
+
+    HIVE-1010: Implement INFORMATION_SCHEMA in Hive (Gunther Hagleitner, reviewed by Thejas Nair)
+
+ .../org/apache/hive/beeline/HiveSchemaHelper.java  |  108 +-
+ .../org/apache/hive/beeline/HiveSchemaTool.java    |  102 +-
+ .../apache/hive/beeline/TestHiveSchemaTool.java    |    4 +-
+ .../java/org/apache/hadoop/hive/conf/HiveConf.java |    2 +
+ .../hadoop/hive/druid/DruidStorageHandler.java     |    6 +
+ .../org/apache/hive/beeline/TestSchemaTool.java    |    4 +-
+ .../test/resources/testconfiguration.properties    |    1 +
+ .../apache/hive/storage/jdbc/JdbcInputFormat.java  |   15 +-
+ .../apache/hive/storage/jdbc/JdbcRecordReader.java |    4 +-
+ .../org/apache/hive/storage/jdbc/JdbcSerDe.java    |    4 +-
+ .../hive/storage/jdbc/JdbcStorageHandler.java      |   39 +-
+ .../hive/storage/jdbc/conf/DatabaseType.java       |    6 +-
+ .../jdbc/conf/JdbcStorageConfigManager.java        |   98 +-
+ .../jdbc/dao/GenericJdbcDatabaseAccessor.java      |   18 +-
+ .../hive/storage/jdbc/dao/JdbcRecordIterator.java  |    3 -
+ .../storage/jdbc/dao/MySqlDatabaseAccessor.java    |    2 +-
+ .../hive/config/JdbcStorageConfigManagerTest.java  |   12 +-
+ .../hadoop/hive/llap/cli/LlapServiceDriver.java    |    4 +-
+ .../upgrade/hive/hive-schema-3.0.0.hive.sql        | 1223 +++++++
+ .../hadoop/hive/ql/exec/FileSinkOperator.java      |   22 +-
+ .../org/apache/hadoop/hive/ql/exec/Utilities.java  |   46 +-
+ .../apache/hadoop/hive/ql/exec/tez/DagUtils.java   |    3 +-
+ .../hive/ql/index/HiveIndexedInputFormat.java      |    7 +-
+ .../apache/hadoop/hive/ql/io/HiveInputFormat.java  |   16 +-
+ .../hive/ql/io/parquet/ProjectionPusher.java       |    9 +-
+ .../hive/ql/metadata/DefaultStorageHandler.java    |    5 +
+ .../hive/ql/metadata/HiveStorageHandler.java       |    6 +
+ .../hadoop/hive/ql/parse/UnparseTranslator.java    |    1 -
+ .../apache/hadoop/hive/ql/plan/PartitionDesc.java  |    5 +-
+ .../org/apache/hadoop/hive/ql/plan/PlanUtils.java  |   15 +
+ .../org/apache/hadoop/hive/ql/plan/TableDesc.java  |    9 +
+ .../apache/hadoop/hive/ql/ppd/OpProcFactory.java   |   20 +-
+ .../hive/ql/exec/InputEstimatorTestClass.java      |    5 +
+ ql/src/test/queries/clientpositive/jdbc_handler.q  |   23 +-
+ ql/src/test/queries/clientpositive/sysdb.q         |  117 +
+ .../results/clientpositive/llap/jdbc_handler.q.out |   42 +-
+ .../test/results/clientpositive/llap/sysdb.q.out   | 3447 ++++++++++++++++++++
+ 37 files changed, 5308 insertions(+), 145 deletions(-)
+
+commit 72604208e9460483c1a05033cb37155aa8c2304d
+Author: Zoltan Haindrich <kirk@rxd.hu>
+Date:   Sun May 14 23:52:32 2017 -0700
+
+    HIVE-16416 : Service: move constants out from HiveAuthFactory (Zoltan Haindrich, reviewed by Peter Vary, Thejas Nair)
+
+ .../org/apache/hive/beeline/ProxyAuthTest.java     |  4 +-
+ .../apache/hive/minikdc/TestHiveAuthFactory.java   |  5 ++-
+ .../apache/hive/minikdc/TestJdbcWithMiniKdc.java   |  4 +-
+ .../cli/thrift/TestThriftCLIServiceWithBinary.java |  5 ++-
+ .../cli/thrift/TestThriftCLIServiceWithHttp.java   |  5 ++-
+ .../thrift/TestThriftHttpCLIServiceFeatures.java   |  5 ++-
+ .../thrift/ThriftCliServiceMessageSizeTest.java    |  5 ++-
+ .../java/org/apache/hive/jdbc/HiveConnection.java  | 10 ++---
+ .../hive/service/auth/HiveAuthConstants.java       | 43 ++++++++++++++++++
+ .../apache/hive/service/auth/HiveAuthFactory.java  | 52 ++++++----------------
+ .../hive/service/cli/thrift/ThriftCLIService.java  |  7 +--
+ .../hive/service/cli/thrift/ThriftHttpServlet.java |  7 +--
+ .../cli/TestRetryingThriftCLIServiceClient.java    |  4 +-
+ .../hive/service/cli/session/TestSessionHooks.java |  4 +-
+ .../cli/thrift/ThriftCliServiceTestWithCookie.java |  5 ++-
+ 15 files changed, 96 insertions(+), 69 deletions(-)
+
+commit c90aa83fbefe256288ef5df8a2d10b0e355f4795
+Author: Peter Vary <pvary@cloudera.com>
+Date:   Sun May 14 19:32:20 2017 -0700
+
+    HIVE-15725 : Make it possible to run checkstyle for a specific module (Peter Vary via Thejas Nair)
+
+ checkstyle/checkstyle.xml | 4 ++--
+ pom.xml                   | 3 ++-
+ 2 files changed, 4 insertions(+), 3 deletions(-)
+
+commit 877bbf0e5458f7b8a872511faa222e6992167e86
+Author: Jesus Camacho Rodriguez <jcamacho@apache.org>
+Date:   Sat May 13 08:15:27 2017 +0100
+
+    HIVE-16602: Implement shared scans with Tez (Jesus Camacho Rodriguez, reviewed by Ashutosh Chauhan) (addendum)
+
+ .../org/apache/hadoop/hive/ql/optimizer/SharedScanOptimizer.java    | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+commit 59f6577296bfcdb5d8e74657f7eb6d6294630b23
+Author: Jesus Camacho Rodriguez <jcamacho@apache.org>
+Date:   Thu May 4 20:27:40 2017 +0100
+
+    HIVE-16602: Implement shared scans with Tez (Jesus Camacho Rodriguez, reviewed by Ashutosh Chauhan)
+
+ .../java/org/apache/hadoop/hive/conf/HiveConf.java |    4 +
+ .../hive/ql/optimizer/ConvertJoinMapJoin.java      |    9 +-
+ .../hadoop/hive/ql/optimizer/MapJoinProcessor.java |   11 +-
+ .../hive/ql/optimizer/ReduceSinkMapJoinProc.java   |    6 +-
+ .../hive/ql/optimizer/SharedScanOptimizer.java     |  625 ++++++
+ .../optimizer/physical/GenMRSkewJoinProcessor.java |    2 +-
+ .../physical/GenSparkSkewJoinProcessor.java        |    2 +-
+ .../apache/hadoop/hive/ql/parse/GenTezWork.java    |   10 +-
+ .../apache/hadoop/hive/ql/parse/TezCompiler.java   |   75 +-
+ .../org/apache/hadoop/hive/ql/plan/JoinDesc.java   |   12 +
+ .../apache/hadoop/hive/ql/plan/MapJoinDesc.java    |    3 +-
+ ql/src/test/queries/clientpositive/perf/query88.q  |    2 +
+ .../results/clientpositive/llap/auto_join0.q.out   |   15 +-
+ .../results/clientpositive/llap/auto_join30.q.out  |   67 +-
+ .../llap/auto_sortmerge_join_9.q.out               |   70 +-
+ .../clientpositive/llap/bucket_map_join_tez1.q.out |   11 +-
+ .../llap/correlationoptimizer2.q.out               |   26 +-
+ .../llap/correlationoptimizer3.q.out               |  188 +-
+ .../llap/correlationoptimizer6.q.out               |  104 +-
+ .../llap/dynamic_partition_pruning.q.out           |   92 +-
+ .../clientpositive/llap/except_distinct.q.out      |   92 +-
+ .../clientpositive/llap/explainuser_1.q.out        |  137 +-
+ .../clientpositive/llap/explainuser_2.q.out        |  772 ++++----
+ .../clientpositive/llap/intersect_merge.q.out      |   83 +-
+ .../test/results/clientpositive/llap/join46.q.out  |   38 +-
+ .../clientpositive/llap/limit_join_transpose.q.out |  242 +--
+ .../clientpositive/llap/limit_pushdown.q.out       |   17 +-
+ .../clientpositive/llap/llap_nullscan.q.out        |   15 +-
+ .../results/clientpositive/llap/mapjoin46.q.out    |   43 +-
+ ql/src/test/results/clientpositive/llap/mrr.q.out  |   82 +-
+ .../clientpositive/llap/multiMapJoin2.q.out        |  209 +-
+ .../llap/offset_limit_ppd_optimizer.q.out          |   17 +-
+ .../results/clientpositive/llap/subquery_in.q.out  |  173 +-
+ .../clientpositive/llap/subquery_multi.q.out       |  617 +++---
+ .../clientpositive/llap/subquery_notin.q.out       | 1539 ++++++---------
+ .../clientpositive/llap/subquery_null_agg.q.out    |   26 +-
+ .../clientpositive/llap/subquery_scalar.q.out      |  359 ++--
+ .../clientpositive/llap/subquery_select.q.out      |  957 ++++-----
+ .../clientpositive/llap/subquery_views.q.out       |  274 ++-
+ .../clientpositive/llap/tez_join_tests.q.out       |   29 +-
+ .../clientpositive/llap/tez_joins_explain.q.out    |   29 +-
+ .../clientpositive/llap/unionDistinct_1.q.out      |  261 ++-
+ .../clientpositive/llap/union_top_level.q.out      |   50 +-
+ .../llap/vector_groupby_grouping_sets4.q.out       |   43 +-
+ .../llap/vector_groupby_mapjoin.q.out              |   26 +-
+ .../clientpositive/llap/vector_join30.q.out        |  122 +-
+ .../vectorized_dynamic_partition_pruning.q.out     |  108 +-
+ .../test/results/clientpositive/perf/query1.q.out  |   88 +-
+ .../test/results/clientpositive/perf/query14.q.out | 2032 ++++++++++----------
+ .../test/results/clientpositive/perf/query16.q.out |   27 +-
+ .../test/results/clientpositive/perf/query17.q.out |   68 +-
+ .../test/results/clientpositive/perf/query23.q.out |  477 +++--
+ .../test/results/clientpositive/perf/query25.q.out |   68 +-
+ .../test/results/clientpositive/perf/query28.q.out |   87 +-
+ .../test/results/clientpositive/perf/query29.q.out |   19 +-
+ .../test/results/clientpositive/perf/query30.q.out |  114 +-
+ .../test/results/clientpositive/perf/query31.q.out |  270 ++-
+ .../test/results/clientpositive/perf/query32.q.out |   34 +-
+ .../test/results/clientpositive/perf/query33.q.out |  252 ++-
+ .../test/results/clientpositive/perf/query38.q.out |   94 +-
+ .../test/results/clientpositive/perf/query39.q.out |   58 +-
+ .../test/results/clientpositive/perf/query46.q.out |   75 +-
+ .../test/results/clientpositive/perf/query5.q.out  |   70 +-
+ .../test/results/clientpositive/perf/query51.q.out |   83 +-
+ .../test/results/clientpositive/perf/query56.q.out |  252 ++-
+ .../test/results/clientpositive/perf/query58.q.out |  120 +-
+ .../test/results/clientpositive/perf/query6.q.out  |   19 +-
+ .../test/results/clientpositive/perf/query60.q.out |  252 ++-
+ .../test/results/clientpositive/perf/query64.q.out |  443 ++---
+ .../test/results/clientpositive/perf/query65.q.out |   86 +-
+ .../test/results/clientpositive/perf/query66.q.out |   90 +-
+ .../test/results/clientpositive/perf/query68.q.out |   75 +-
+ .../test/results/clientpositive/perf/query69.q.out |   76 +-
+ .../test/results/clientpositive/perf/query70.q.out |   44 +-
+ .../test/results/clientpositive/perf/query75.q.out |  258 ++-
+ .../test/results/clientpositive/perf/query76.q.out |  126 +-
+ .../test/results/clientpositive/perf/query80.q.out |  106 +-
+ .../test/results/clientpositive/perf/query81.q.out |   57 +-
+ .../test/results/clientpositive/perf/query83.q.out |  225 ++-
+ .../test/results/clientpositive/perf/query85.q.out |   11 +-
+ .../test/results/clientpositive/perf/query87.q.out |   94 +-
+ .../test/results/clientpositive/perf/query88.q.out |  358 ++--
+ .../test/results/clientpositive/perf/query9.q.out  |  170 +-
+ .../test/results/clientpositive/perf/query90.q.out |   58 +-
+ .../test/results/clientpositive/perf/query92.q.out |   35 +-
+ .../test/results/clientpositive/perf/query95.q.out |   70 +-
+ .../test/results/clientpositive/perf/query97.q.out |   35 +-
+ .../clientpositive/tez/explainanalyze_2.q.out      |  412 ++--
+ .../clientpositive/tez/explainanalyze_3.q.out      |    8 +-
+ .../results/clientpositive/tez/explainuser_3.q.out |    8 +-
+ 90 files changed, 7086 insertions(+), 8012 deletions(-)
+
+commit f2fa83cd1552e85526ff02a6f3473f5a36bfde8f
+Author: Saijin Huang <huang.saijin@zte.com.cn>
+Date:   Sat May 13 12:16:45 2017 +0800
+
+    HIVE-16658: TestTimestampTZ.java has missed the ASF header (Saijin Huang via Rui)
+
+ .../hadoop/hive/common/type/TestTimestampTZ.java       | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+commit 4291c467aac81bcef140f1b8b8cdaba6edaf2f96
+Author: Jason Dere <jdere@hortonworks.com>
+Date:   Fri May 12 16:52:31 2017 -0700
+
+    HIVE-16652: LlapInputFormat: Seeing "output error" WARN message (Jason Dere, reviewed by Siddharth Seth)
+
+ .../llap/ext/LlapTaskUmbilicalExternalClient.java  | 89 +++++++++++++++++++++-
+ .../helpers/LlapTaskUmbilicalServer.java           |  4 +
+ 2 files changed, 90 insertions(+), 3 deletions(-)
+
+commit fea6df6bcca6fcd76b95257d838e6d741dcf3f2b
+Author: Jason Dere <jdere@hortonworks.com>
+Date:   Fri May 12 16:39:50 2017 -0700
+
+    HIVE-16651: LlapProtocolClientProxy stack trace when using llap input format (Jason Dere, reviewed by Siddharth Seth)
+
+ .../src/test/java/org/apache/hive/jdbc/TestJdbcWithMiniLlap.java     | 1 +
+ .../org/apache/hadoop/hive/llap/tez/LlapProtocolClientProxy.java     | 5 ++++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+commit 3baaca747d7bd81d58a8651074af5aed67067c6f
+Author: Siddharth Seth <sseth@HW10890.local>
+Date:   Fri May 12 15:49:27 2017 -0700
+
+    HIVE-16639. LLAP: Derive shuffle thread counts and keep-alive connections from instance count. (Siddharth Seth, reviewed by Gopal V)
+
+ .../org/apache/hadoop/hive/llap/shufflehandler/ShuffleHandler.java  | 4 ++--
+ llap-server/src/main/resources/package.py                           | 6 +++++-
+ 2 files changed, 7 insertions(+), 3 deletions(-)
+
+commit 113a099125fa0dae25bbb8417582edeeeed5aac3
+Author: Siddharth Seth <sseth@HW10890.local>
+Date:   Fri May 12 14:48:46 2017 -0700
+
+    HIVE-16634. LLAP Use a pool of connections to a single AM from a daemon.
+    (Siddharth Seth, reviewed by Sergey Shelukhin)
+
+ .../hadoop/hive/llap/daemon/impl/QueryInfo.java    | 44 ++++++++++++----------
+ .../hadoop/hive/llap/daemon/impl/QueryTracker.java |  4 +-
+ .../hive/llap/daemon/impl/TaskRunnerCallable.java  |  1 +
+ .../llap/daemon/impl/TaskExecutorTestHelpers.java  |  5 ++-
+ 4 files changed, 31 insertions(+), 23 deletions(-)
+
+commit 8a7b5b565ad1c719afcd565c41523ef0bd1edbfb
+Author: Daniel Dai <daijy@hortonworks.com>
+Date:   Fri May 12 11:31:42 2017 -0700
+
+    HIVE-16586: Fix Unit test failures when CachedStore is enabled (Daniel Dai, reviewed by Thejas Nair)
+
+ .../java/org/apache/hadoop/hive/metastore/cache/CacheUtils.java  | 2 +-
+ .../java/org/apache/hadoop/hive/metastore/cache/CachedStore.java | 9 ++++++---
+ .../java/org/apache/hadoop/hive/metastore/hbase/HBaseUtils.java  | 3 ++-
+ 3 files changed, 9 insertions(+), 5 deletions(-)
+
+commit dd2697c00dffe17699f19f8accfbf5c14bd07219
+Author: Yongzhi Chen <ychena@apache.org>
+Date:   Fri May 12 14:10:10 2017 -0400
+
+    HIVE-14389: Beeline should not output query and prompt to stdout (Vihang Karajgaonkar, reviewed by Peter Vary, Thejas M Nair and Yongzhi Chen)
+
+ beeline/src/java/org/apache/hive/beeline/BeeLine.java    |  9 +++++++--
+ .../test/org/apache/hive/beeline/cli/TestHiveCli.java    |  8 ++++----
+ .../org/apache/hive/beeline/TestBeeLineWithArgs.java     | 16 +++++++++++-----
+ 3 files changed, 22 insertions(+), 11 deletions(-)
+
+commit c9cfb60199df5163c22015a536ead22971dd0d19
+Author: Naveen Gangam <ngangam@apache.org>
+Date:   Fri May 12 13:27:30 2017 -0400
+
+    HIVE-16555 Add a new thrift API call for get_metastore_uuid (Vihang Karajgaonkar, reviewed by Naveen Gangam, Sahil Takiar and Alan Gates)
+
+ .../hcatalog/listener/DummyRawStoreFailEvent.java  |    7 +-
+ .../hive/metastore/TestEmbeddedHiveMetaStore.java  |   18 +-
+ .../hadoop/hive/metastore/TestHiveMetaStore.java   |   49 +
+ .../hive/metastore/TestRemoteHiveMetaStore.java    |   11 +-
+ .../hive/metastore/TestSetUGIOnOnlyClient.java     |    9 +-
+ .../hive/metastore/TestSetUGIOnOnlyServer.java     |    9 +-
+ metastore/if/hive_metastore.thrift                 |    2 +
+ .../src/gen/thrift/gen-cpp/ThriftHiveMetastore.cpp |  390 +++++
+ .../src/gen/thrift/gen-cpp/ThriftHiveMetastore.h   |  122 ++
+ .../ThriftHiveMetastore_server.skeleton.cpp        |    5 +
+ .../hive/metastore/api/ThriftHiveMetastore.java    | 1767 +++++++++++++++-----
+ .../gen-php/metastore/ThriftHiveMetastore.php      |  208 +++
+ .../hive_metastore/ThriftHiveMetastore-remote      |    7 +
+ .../gen-py/hive_metastore/ThriftHiveMetastore.py   |  178 ++
+ .../src/gen/thrift/gen-rb/thrift_hive_metastore.rb |   60 +
+ .../hadoop/hive/metastore/HiveMetaStore.java       |   10 +
+ .../hadoop/hive/metastore/HiveMetaStoreClient.java |    5 +
+ .../hadoop/hive/metastore/IMetaStoreClient.java    |    8 +
+ .../apache/hadoop/hive/metastore/ObjectStore.java  |   76 +
+ .../org/apache/hadoop/hive/metastore/RawStore.java |    7 +
+ .../hadoop/hive/metastore/cache/CachedStore.java   |    5 +
+ .../hadoop/hive/metastore/hbase/HBaseStore.java    |    5 +
+ .../metastore/model/MMetastoreDBProperties.java    |   56 +
+ metastore/src/model/package.jdo                    |   18 +
+ .../metastore/DummyRawStoreControlledCommit.java   |    5 +
+ .../metastore/DummyRawStoreForJdoConnection.java   |    7 +-
+ 26 files changed, 2565 insertions(+), 479 deletions(-)
